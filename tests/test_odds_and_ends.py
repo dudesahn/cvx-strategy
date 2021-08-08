@@ -298,6 +298,7 @@ def test_odds_and_ends_rekt(
     # we can also withdraw from an empty vault as well
     vault.withdraw({"from": whale})
 
+
 # goal of this one is to hit a withdraw when we don't have any staked assets
 def test_odds_and_ends_liquidate_rekt(
     gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
@@ -320,6 +321,7 @@ def test_odds_and_ends_liquidate_rekt(
 
     # we can also withdraw from an empty vault as well, but make sure we're okay with losing 100%
     vault.withdraw(10e18, whale, 10000, {"from": whale})
+
 
 def test_weird_reverts(
     gov,
