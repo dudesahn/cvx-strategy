@@ -51,7 +51,7 @@ def test_change_debt_with_profit(
     chain.sleep(86400 * 7)
     chain.mine(1)
 
-    # we harvest first to take profits, then again to send the profit to the strategy. This is for our last check below. 
+    # we harvest first to take profits, then again to send the profit to the strategy. This is for our last check below.
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -81,5 +81,7 @@ def test_change_debt_with_profit(
     # assert that our vault total assets, multiplied by our debtRatio, is about equal to our estimated total assets (within 5 wei)
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     assert math.isclose(
-        vault.totalAssets() * new_params["debtRatio"]/10_000, strategy.estimatedTotalAssets(), abs_tol=5
+        vault.totalAssets() * new_params["debtRatio"] / 10_000,
+        strategy.estimatedTotalAssets(),
+        abs_tol=5,
     )

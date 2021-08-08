@@ -5,15 +5,7 @@ import math
 
 
 def test_simple_harvest(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    staking
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

@@ -37,9 +37,9 @@ interface IStaking {
     function getReward(bool _stake) external; // claim our rewards
 
     function stake(uint256 _amount) external; // this is depositing
-    
+
     function withdraw(uint256 _amount, bool claim) external;
-    
+
     function balanceOf(address account) external view returns (uint256);
 }
 
@@ -50,8 +50,9 @@ contract StrategyCvxStaking is BaseStrategy {
 
     /* ========== STATE VARIABLES ========== */
 
-    address public constant cvxStaking = 0xCF50b810E57Ac33B91dCF525C6ddd9881B139332;
-    
+    address public constant cvxStaking =
+        0xCF50b810E57Ac33B91dCF525C6ddd9881B139332;
+
     // Swap stuff
 
     address public sushiswapRouter = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
@@ -64,7 +65,7 @@ contract StrategyCvxStaking is BaseStrategy {
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-        
+
     // only need this in emergencies
     bool public claim;
 
@@ -75,15 +76,15 @@ contract StrategyCvxStaking is BaseStrategy {
         minReportDelay = 0;
         maxReportDelay = 604800; // 7 days in seconds, if we hit this then harvestTrigger = True
         profitFactor = 400;
-        debtThreshold = 1000 * 1e18; // we shouldn't ever have loss, but set a bit of a buffer
+        debtThreshold = 500 * 1e18; // we shouldn't ever have loss, but set a bit of a buffer
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want is CVX
         want.safeApprove(address(cvxStaking), type(uint256).max);
-        
+
         // approve our reward token
         cvxCrv.safeApprove(sushiswapRouter, type(uint256).max);
-        
+
         // swap path
         convexPath = new address[](4);
         convexPath[0] = address(cvxCrv);
@@ -107,8 +108,7 @@ contract StrategyCvxStaking is BaseStrategy {
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return
-            _balanceOfWant().add(_stakedBalance());
+        return _balanceOfWant().add(_stakedBalance());
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -124,18 +124,17 @@ contract StrategyCvxStaking is BaseStrategy {
     {
         // claim our rewards
         IStaking(cvxStaking).getReward(false);
-        
+
         // sell our claimed rewards for more CVX
         uint256 cvxRewards = IERC20(cvxCrv).balanceOf(address(this));
         if (cvxRewards > 0) {
             IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
-            	cvxRewards,
-            	uint256(0),
-            	convexPath,
-            	address(this),
-            	now
-        );
-        
+                cvxRewards,
+                uint256(0),
+                convexPath,
+                address(this),
+                now
+            );
         }
 
         // serious loss should never happen, but if it does (for instance, if convex is hacked), let's record it accurately
@@ -153,10 +152,8 @@ contract StrategyCvxStaking is BaseStrategy {
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
             IStaking(cvxStaking).withdraw(
-                Math.min(
-                    _stakedBalance(),
-                    _debtOutstanding
-                ), false
+                Math.min(_stakedBalance(), _debtOutstanding),
+                false
             );
 
             _debtPayment = Math.min(_debtOutstanding, _balanceOfWant());
@@ -186,7 +183,10 @@ contract StrategyCvxStaking is BaseStrategy {
     {
         uint256 wantBal = _balanceOfWant();
         if (_amountNeeded > wantBal) {
-            IStaking(cvxStaking).withdraw(Math.min(_stakedBalance(), _amountNeeded.sub(wantBal)), false);
+            IStaking(cvxStaking).withdraw(
+                Math.min(_stakedBalance(), _amountNeeded.sub(wantBal)),
+                false
+            );
 
             uint256 withdrawnBal = _balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, withdrawnBal);
@@ -207,12 +207,10 @@ contract StrategyCvxStaking is BaseStrategy {
     function prepareMigration(address _newStrategy) internal override {
         if (_stakedBalance() > 0) {
             IStaking(cvxStaking).withdraw(_stakedBalance(), claim);
-        }        
+        }
         uint256 cvxRewards = IERC20(cvxCrv).balanceOf(address(this));
         if (cvxRewards > 0) {
-            IERC20(cvxCrv).safeTransfer(
-            	_newStrategy, cvxRewards
-        );
+            IERC20(cvxCrv).safeTransfer(_newStrategy, cvxRewards);
         }
     }
 
@@ -288,10 +286,9 @@ contract StrategyCvxStaking is BaseStrategy {
         }
         return _ethToWant;
     }
-    
+
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
     function setClaim(bool _claim) external onlyAuthorized {
         claim = _claim;
     }
-    
 }

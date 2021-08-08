@@ -101,6 +101,7 @@ def vault(pm, gov, rewards, guardian, management, token, chain):
     chain.sleep(1)
     yield vault
 
+
 # use this if your vault is already deployed
 # @pytest.fixture(scope="function")
 # def vault(pm, gov, rewards, guardian, management, token, chain):

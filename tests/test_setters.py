@@ -13,6 +13,7 @@ def test_setters(gov, strategy, strategist, chain, whale):
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
+    strategy.setClaim(True, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -47,6 +48,8 @@ def test_setters(gov, strategy, strategist, chain, whale):
         strategy.setMaxReportDelay(1000, {"from": whale})
     with brownie.reverts():
         strategy.setRewards(strategist, {"from": whale})
+    with brownie.reverts():
+        strategy.setClaim(True, {"from": whale})
 
     # try a health check with zero address as health check
     strategy.setHealthCheck(zero, {"from": gov})

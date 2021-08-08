@@ -36,7 +36,9 @@ def test_revoke_strategy_from_vault(
     vaultAssets_after_revoke = vault.totalAssets()
 
     # confirm we made money, or at least that we have about the same
-    assert vaultAssets_after_revoke >= vaultAssets_starting or math.isclose(vaultAssets_after_revoke, vaultAssets_starting, abs_tol=5)
+    assert vaultAssets_after_revoke >= vaultAssets_starting or math.isclose(
+        vaultAssets_after_revoke, vaultAssets_starting, abs_tol=5
+    )
     assert strategy.estimatedTotalAssets() == 0
     assert token.balanceOf(vault) >= vault_holdings_starting + strategy_starting
 
