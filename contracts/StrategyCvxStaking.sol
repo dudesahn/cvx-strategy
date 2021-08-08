@@ -151,12 +151,15 @@ contract StrategyCvxStaking is BaseStrategy {
 
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            IStaking(cvxStaking).withdraw(
-                Math.min(_stakedBalance(), _debtOutstanding),
-                false
-            );
-
-            _debtPayment = Math.min(_debtOutstanding, _balanceOfWant());
+            if (_stakedBalance() > 0) {
+                // can't withdraw 0
+                IStaking(cvxStaking).withdraw(
+                    Math.min(_stakedBalance(), _debtOutstanding),
+                    false
+                );
+            }
+            uint256 withdrawnBal = _balanceOfWant();
+            _debtPayment = Math.min(_debtOutstanding, withdrawnBal);
             if (_debtPayment < _debtOutstanding) {
                 _loss = _loss.add(_debtOutstanding.sub(_debtPayment));
                 _profit = 0;
@@ -183,11 +186,13 @@ contract StrategyCvxStaking is BaseStrategy {
     {
         uint256 wantBal = _balanceOfWant();
         if (_amountNeeded > wantBal) {
-            IStaking(cvxStaking).withdraw(
-                Math.min(_stakedBalance(), _amountNeeded.sub(wantBal)),
-                false
-            );
-
+            if (_stakedBalance() > 0) {
+                // can't withdraw 0
+                IStaking(cvxStaking).withdraw(
+                    Math.min(_stakedBalance(), _amountNeeded.sub(wantBal)),
+                    false
+                );
+            }
             uint256 withdrawnBal = _balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, withdrawnBal);
             _loss = _amountNeeded.sub(_liquidatedAmount);
@@ -199,6 +204,7 @@ contract StrategyCvxStaking is BaseStrategy {
 
     function liquidateAllPositions() internal override returns (uint256) {
         if (_stakedBalance() > 0) {
+            // can't withdraw 0
             IStaking(cvxStaking).withdraw(_stakedBalance(), false);
         }
         return _balanceOfWant();
@@ -206,6 +212,7 @@ contract StrategyCvxStaking is BaseStrategy {
 
     function prepareMigration(address _newStrategy) internal override {
         if (_stakedBalance() > 0) {
+            // can't withdraw 0
             IStaking(cvxStaking).withdraw(_stakedBalance(), claim);
         }
         uint256 cvxRewards = IERC20(cvxCrv).balanceOf(address(this));

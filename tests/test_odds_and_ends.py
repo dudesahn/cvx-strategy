@@ -268,6 +268,34 @@ def test_odds_and_ends_liquidatePosition(
     )
 
 
+def test_odds_and_ends_rekt(
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
+):
+    ## deposit to the vault after approving. turn off health check since we're doing weird shit
+    strategy.setDoHealthCheck(False, {"from": gov})
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(1000e18, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # send away all funds, will need to alter this based on strategy
+    to_send = staking.balanceOf(strategy)
+    print("CVX Balance of Vault", to_send)
+    staking.withdrawAll(False, {"from": strategy})
+    token.transfer(gov, to_send, {"from": strategy})
+    assert strategy.estimatedTotalAssets() == 0
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+
+    chain.sleep(1)
+    strategy.setDoHealthCheck(False, {"from": gov})
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    # we can also withdraw from an empty vault as well
+    vault.withdraw({"from": whale})
+
 def test_weird_reverts(
     gov,
     token,
