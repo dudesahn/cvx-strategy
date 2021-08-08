@@ -161,7 +161,7 @@ contract StrategyCvxStaking is BaseStrategy {
             uint256 withdrawnBal = _balanceOfWant();
             _debtPayment = Math.min(_debtOutstanding, withdrawnBal);
             if (_debtPayment < _debtOutstanding) {
-                _loss = _loss.add(_debtOutstanding.sub(_debtPayment));
+                _loss = _debtOutstanding.sub(_debtPayment);
                 _profit = 0;
             }
         }
