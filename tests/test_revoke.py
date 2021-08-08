@@ -5,12 +5,7 @@ import math
 
 
 def test_revoke_strategy_from_vault(
-    gov,
-    token,
-    vault,
-    whale,
-    chain,
-    strategy,
+    gov, token, vault, whale, chain, strategy,
 ):
 
     ## deposit to the vault after approving

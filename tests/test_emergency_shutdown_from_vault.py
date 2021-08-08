@@ -5,12 +5,7 @@ import math
 
 # test passes as of 21-06-26
 def test_emergency_shutdown_from_vault(
-    gov,
-    token,
-    vault,
-    whale,
-    strategy,
-    chain,
+    gov, token, vault, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)

@@ -4,13 +4,7 @@ import math
 
 # test passes as of 21-06-26
 def test_change_debt_with_profit(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
+    gov, token, vault, strategist, whale, strategy, chain,
 ):
 
     ## deposit to the vault after approving

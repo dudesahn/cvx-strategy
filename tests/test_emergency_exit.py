@@ -5,12 +5,7 @@ from brownie import config
 
 # test passes as of 21-06-26
 def test_emergency_exit(
-    gov,
-    token,
-    vault,
-    whale,
-    strategy,
-    chain,
+    gov, token, vault, whale, strategy, chain,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -44,12 +39,7 @@ def test_emergency_exit(
 
 
 def test_emergency_exit_with_profit(
-    gov,
-    token,
-    vault,
-    whale,
-    strategy,
-    chain,
+    gov, token, vault, whale, strategy, chain,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
