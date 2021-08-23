@@ -65,7 +65,7 @@ contract StrategyCvxStaking is BaseStrategy {
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    bool internal keeperHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // only need this in emergencies
@@ -178,7 +178,7 @@ contract StrategyCvxStaking is BaseStrategy {
         }
 
         // we're done harvesting, so reset our trigger if we used it
-        if (manualHarvestNow) manualHarvestNow = false;
+        if (keeperHarvestNow) keeperHarvestNow = false;
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
@@ -258,7 +258,7 @@ contract StrategyCvxStaking is BaseStrategy {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (manualHarvestNow) return true;
+        if (keeperHarvestNow) return true;
 
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) return false;
@@ -294,8 +294,8 @@ contract StrategyCvxStaking is BaseStrategy {
     }
 
     // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
-        manualHarvestNow = _manualHarvestNow;
+    function setManualHarvest(bool _keeperHarvestNow) external onlyAuthorized {
+        keeperHarvestNow = _keeperHarvestNow;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
