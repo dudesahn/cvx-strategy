@@ -3,7 +3,9 @@ from brownie import Contract
 from brownie import config
 
 
-def test_setters(gov, strategy, strategist, chain, whale, amount, token, vault,):
+def test_setters(
+    gov, strategy, strategist, chain, whale, amount, token, vault,
+):
 
     # test our manual harvest trigger
     strategy.setManualHarvest(True, {"from": gov})

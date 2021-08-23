@@ -214,7 +214,16 @@ def test_odds_and_ends_migration(
 
 
 def test_odds_and_ends_liquidatePosition(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    staking,
+    amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -274,7 +283,16 @@ def test_odds_and_ends_liquidatePosition(
 
 
 def test_odds_and_ends_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    staking,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -306,7 +324,16 @@ def test_odds_and_ends_rekt(
 
 # goal of this one is to hit a withdraw when we don't have any staked assets
 def test_odds_and_ends_liquidate_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    staking,
+    amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -359,17 +386,10 @@ def test_weird_reverts(
     with brownie.reverts():
         strategy.withdraw(1e18, {"from": gov})
 
+
 # this one makes sure our harvestTrigger doesn't trigger when we don't have assets in the strategy
 def test_odds_and_ends_inactive_strat(
-    gov,
-    token,
-    vault,
-    strategist,
-    whale,
-    strategy,
-    chain,
-    strategist_ms,
-    amount,
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, amount,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
@@ -386,4 +406,3 @@ def test_odds_and_ends_inactive_strat(
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
-

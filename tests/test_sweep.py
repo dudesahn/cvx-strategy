@@ -4,7 +4,16 @@ from brownie import config
 
 
 def test_sweep(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, farmed, amount,
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    farmed,
+    amount,
 ):
 
     ## deposit to the vault after approving
