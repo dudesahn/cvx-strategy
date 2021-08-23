@@ -15,17 +15,19 @@ def test_migration(
     strategy,
     chain,
     strategist_ms,
+    amount,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCvxStaking, vault)
+    new_strategy = strategist.deploy(StrategyCvxStaking, vault, strategy_name)
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no

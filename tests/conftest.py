@@ -16,13 +16,35 @@ def token():
 
 
 @pytest.fixture(scope="module")
+def whale(accounts):
+    # Totally in it for the tech
+    # Update this with a large holder of your want token (largest EOA holder of CVX)
+    whale = accounts.at("0x97B3629Dc0EaD17115b8f91a93509EA472FFAFCa", force=True)
+    yield whale
+
+
+# this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
+@pytest.fixture(scope="module")
+def amount():
+    amount = 10000e18
+    yield amount
+
+
+# this is the name we want to give our strategy
+@pytest.fixture(scope="module")
+def strategy_name():
+    strategy_name = "StrategyCVXStaking"
+    yield strategy_name
+
+
+@pytest.fixture(scope="module")
 def healthCheck():
     yield Contract("0xDDCea799fF1699e98EDF118e0629A974Df7DF012")
 
 
 @pytest.fixture(scope="module")
 def farmed():
-    # this is the token that we are farming and selling for more of our want. In this case, we don't have one (this contract is xyz, from old strat).
+    # this is the token that we are farming and selling for more of our want.
     yield Contract("0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7")
 
 
@@ -76,14 +98,6 @@ def strategist(accounts):
     yield accounts.at("0xBedf3Cf16ba1FcE6c3B751903Cf77E51d51E05b8", force=True)
 
 
-@pytest.fixture(scope="module")
-def whale(accounts):
-    # Totally in it for the tech
-    # Update this with a large holder of your want token (largest EOA holder of CVX)
-    whale = accounts.at("0x1A616DAe57382a9084C026D3F475AED59c2668cB", force=True)
-    yield whale
-
-
 # # list any existing strategies here
 # @pytest.fixture(scope="module")
 # def LiveStrategy_1():
@@ -121,9 +135,10 @@ def strategy(
     token,
     healthCheck,
     chain,
+    strategy_name,
 ):
     # parameters for this are: strategy, vault, max deposit, minTimePerInvest, slippage protection (10000 = 100% slippage allowed),
-    strategy = strategist.deploy(StrategyCvxStaking, vault)
+    strategy = strategist.deploy(StrategyCvxStaking, vault, strategy_name)
     strategy.setKeeper(keeper, {"from": gov})
     # set our management fee to zero so it doesn't mess with our profit checking
     vault.setManagementFee(0, {"from": gov})

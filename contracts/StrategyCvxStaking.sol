@@ -55,7 +55,7 @@ contract StrategyCvxStaking is BaseStrategy {
 
     // Swap stuff
 
-    address public sushiswapRouter = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
+    address public sushiswap = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address[] public convexPath; // path to sell cvxCRV for more CVX
     IERC20 public constant cvxCrv =
         IERC20(0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7);
@@ -65,13 +65,18 @@ contract StrategyCvxStaking is BaseStrategy {
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    bool internal manualHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    string internal stratName; // we use this to be able to adjust our strategy's name
 
     // only need this in emergencies
     bool public claim;
 
     /* ========== CONSTRUCTOR ========== */
 
-    constructor(address _vault) public BaseStrategy(_vault) {
+    constructor(address _vault, string memory _stratName)
+        public
+        BaseStrategy(_vault)
+    {
         // initialize variables
         minReportDelay = 0;
         maxReportDelay = 604800; // 7 days in seconds, if we hit this then harvestTrigger = True
@@ -80,10 +85,10 @@ contract StrategyCvxStaking is BaseStrategy {
         healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
 
         // want is CVX
-        want.safeApprove(address(cvxStaking), type(uint256).max);
+        want.safeApprove(cvxStaking, type(uint256).max);
 
         // approve our reward token
-        cvxCrv.safeApprove(sushiswapRouter, type(uint256).max);
+        cvxCrv.safeApprove(sushiswap, type(uint256).max);
 
         // swap path
         convexPath = new address[](4);
@@ -91,6 +96,9 @@ contract StrategyCvxStaking is BaseStrategy {
         convexPath[1] = address(crv);
         convexPath[2] = address(weth);
         convexPath[3] = address(cvx);
+
+        // set our strategy's name
+        stratName = _stratName;
     }
 
     /* ========== VIEWS ========== */
@@ -99,16 +107,16 @@ contract StrategyCvxStaking is BaseStrategy {
         return "StrategyCvxStaking";
     }
 
-    function _stakedBalance() public view returns (uint256) {
+    function stakedBalance() public view returns (uint256) {
         return IStaking(cvxStaking).balanceOf(address(this));
     }
 
-    function _balanceOfWant() public view returns (uint256) {
+    function balanceOfWant() public view returns (uint256) {
         return want.balanceOf(address(this));
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return _balanceOfWant().add(_stakedBalance());
+        return balanceOfWant().add(stakedBalance());
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -122,13 +130,13 @@ contract StrategyCvxStaking is BaseStrategy {
             uint256 _debtPayment
         )
     {
-        // claim our rewards
+        // claim our rewards but don't re-stake them
         IStaking(cvxStaking).getReward(false);
 
         // sell our claimed rewards for more CVX
         uint256 cvxRewards = IERC20(cvxCrv).balanceOf(address(this));
         if (cvxRewards > 0) {
-            IUniswapV2Router02(sushiswapRouter).swapExactTokensForTokens(
+            IUniswapV2Router02(sushiswap).swapExactTokensForTokens(
                 cvxRewards,
                 uint256(0),
                 convexPath,
@@ -137,34 +145,40 @@ contract StrategyCvxStaking is BaseStrategy {
             );
         }
 
-        // serious loss should never happen, but if it does (for instance, if convex is hacked), let's record it accurately
-        uint256 assets = estimatedTotalAssets();
-        uint256 debt = vault.strategies(address(this)).totalDebt;
-
-        // if assets are greater than debt, things are working great! loss will be 0 by default
-        if (assets > debt) {
-            _profit = assets.sub(debt);
-        } else {
-            // if assets are less than debt, we are in trouble. profit will be 0 by default
-            _loss = debt.sub(assets);
-        }
-
         // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
         if (_debtOutstanding > 0) {
-            if (_stakedBalance() > 0) {
+            uint256 _stakedBal = stakedBalance();
+            if (_stakedBal > 0) {
                 // can't withdraw 0
                 IStaking(cvxStaking).withdraw(
-                    Math.min(_stakedBalance(), _debtOutstanding),
+                    Math.min(_stakedBal, _debtOutstanding),
                     false
                 );
             }
-            uint256 withdrawnBal = _balanceOfWant();
-            _debtPayment = Math.min(_debtOutstanding, withdrawnBal);
-            if (_debtPayment < _debtOutstanding) {
-                _loss = _debtOutstanding.sub(_debtPayment);
-                _profit = 0;
+            uint256 _withdrawnBal = balanceOfWant();
+            _debtPayment = Math.min(_debtOutstanding, _withdrawnBal);
+        }
+
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
+        uint256 assets = estimatedTotalAssets();
+        uint256 debt = vault.strategies(address(this)).totalDebt;
+
+        // if assets are greater than debt, things are working great!
+        if (assets > debt) {
+            _profit = assets.sub(debt);
+            uint256 _wantBal = balanceOfWant();
+            _debtPayment = 0;
+            if (_profit.add(_debtPayment) > _wantBal) {
+                liquidateAllPositions();
             }
         }
+        // if assets are less than debt, we are in trouble
+        else {
+            _loss = debt.sub(assets);
+        }
+
+        // we're done harvesting, so reset our trigger if we used it
+        if (manualHarvestNow) manualHarvestNow = false;
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
@@ -172,7 +186,7 @@ contract StrategyCvxStaking is BaseStrategy {
             return;
         }
         // send all of our want tokens to be deposited
-        uint256 _toInvest = _balanceOfWant();
+        uint256 _toInvest = balanceOfWant();
         // stake only if we have something to stake
         if (_toInvest > 0) {
             IStaking(cvxStaking).stake(_toInvest);
@@ -184,17 +198,18 @@ contract StrategyCvxStaking is BaseStrategy {
         override
         returns (uint256 _liquidatedAmount, uint256 _loss)
     {
-        uint256 wantBal = _balanceOfWant();
-        if (_amountNeeded > wantBal) {
-            if (_stakedBalance() > 0) {
+        uint256 _wantBal = balanceOfWant();
+        if (_amountNeeded > _wantBal) {
+            uint256 _stakedBal = stakedBalance();
+            if (_stakedBal > 0) {
                 // can't withdraw 0
                 IStaking(cvxStaking).withdraw(
-                    Math.min(_stakedBalance(), _amountNeeded.sub(wantBal)),
+                    Math.min(_stakedBal, _amountNeeded.sub(_wantBal)),
                     false
                 );
             }
-            uint256 withdrawnBal = _balanceOfWant();
-            _liquidatedAmount = Math.min(_amountNeeded, withdrawnBal);
+            uint256 _withdrawnBal = balanceOfWant();
+            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
             _loss = _amountNeeded.sub(_liquidatedAmount);
         } else {
             // we have enough balance to cover the liquidation available
@@ -203,17 +218,19 @@ contract StrategyCvxStaking is BaseStrategy {
     }
 
     function liquidateAllPositions() internal override returns (uint256) {
-        if (_stakedBalance() > 0) {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
             // can't withdraw 0
-            IStaking(cvxStaking).withdraw(_stakedBalance(), false);
+            IStaking(cvxStaking).withdraw(_stakedBal, false);
         }
-        return _balanceOfWant();
+        return balanceOfWant();
     }
 
     function prepareMigration(address _newStrategy) internal override {
-        if (_stakedBalance() > 0) {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
             // can't withdraw 0
-            IStaking(cvxStaking).withdraw(_stakedBalance(), claim);
+            IStaking(cvxStaking).withdraw(_stakedBal, claim);
         }
         uint256 cvxRewards = IERC20(cvxCrv).balanceOf(address(this));
         if (cvxRewards > 0) {
@@ -231,6 +248,8 @@ contract StrategyCvxStaking is BaseStrategy {
         return protected;
     }
 
+    /* ========== KEEP3RS ========== */
+
     // our main trigger is regarding our DCA since there is low liquidity for $XYZ
     function harvestTrigger(uint256 callCostinEth)
         public
@@ -238,37 +257,13 @@ contract StrategyCvxStaking is BaseStrategy {
         override
         returns (bool)
     {
-        StrategyParams memory params = vault.strategies(address(this));
+        // trigger if we want to manually harvest
+        if (manualHarvestNow) return true;
 
-        // Should not trigger if Strategy is not activated
-        if (params.activation == 0) return false;
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        if (!isActive()) return false;
 
-        // Should not trigger if we haven't waited long enough since previous harvest
-        if (block.timestamp.sub(params.lastReport) < minReportDelay)
-            return false;
-
-        // Should trigger if hasn't been called in a while
-        if (block.timestamp.sub(params.lastReport) >= maxReportDelay)
-            return true;
-
-        // If some amount is owed, pay it back
-        // NOTE: Since debt is based on deposits, it makes sense to guard against large
-        //       changes to the value from triggering a harvest directly through user
-        //       behavior. This should ensure reasonable resistance to manipulation
-        //       from user-initiated withdrawals as the outstanding debt fluctuates.
-        uint256 outstanding = vault.debtOutstanding();
-        if (outstanding > debtThreshold) return true;
-
-        // Check for profits and losses
-        uint256 total = estimatedTotalAssets();
-        // Trigger if we have a loss to report
-        if (total.add(debtThreshold) < params.totalDebt) return true;
-
-        // Trigger if we haven't harvested in the last week
-        uint256 week = 86400 * 7;
-        if (block.timestamp.sub(params.lastReport) > week) {
-            return true;
-        }
+        return super.harvestTrigger(callCostinEth);
     }
 
     function ethToWant(uint256 _amtInWei)
@@ -284,14 +279,23 @@ contract StrategyCvxStaking is BaseStrategy {
             ethPath[1] = address(want);
 
             uint256[] memory callCostInWant =
-                IUniswapV2Router02(sushiswapRouter).getAmountsOut(
-                    _amtInWei,
-                    ethPath
-                );
+                IUniswapV2Router02(sushiswap).getAmountsOut(_amtInWei, ethPath);
 
             _ethToWant = callCostInWant[callCostInWant.length - 1];
         }
         return _ethToWant;
+    }
+
+    /* ========== SETTERS ========== */
+
+    // This allows us to change the name of a strategy
+    function setName(string calldata _stratName) external onlyAuthorized {
+        stratName = _stratName;
+    }
+
+    // This allows us to manually harvest with our keeper as needed
+    function setManualHarvest(bool _manualHarvestNow) external onlyAuthorized {
+        manualHarvestNow = _manualHarvestNow;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc

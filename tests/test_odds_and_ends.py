@@ -15,13 +15,15 @@ def test_odds_and_ends(
     strategist_ms,
     staking,
     StrategyCvxStaking,
+    amount,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -51,7 +53,7 @@ def test_odds_and_ends(
 
     # we can try to migrate too, lol
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCvxStaking, vault)
+    new_strategy = strategist.deploy(StrategyCvxStaking, vault, strategy_name)
     total_old = strategy.estimatedTotalAssets()
 
     # migrate our old strategy
@@ -110,13 +112,14 @@ def test_odds_and_ends_2(
     strategist_ms,
     staking,
     StrategyCvxStaking,
+    amount,
 ):
 
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -149,17 +152,19 @@ def test_odds_and_ends_migration(
     strategy,
     chain,
     strategist_ms,
+    amount,
+    strategy_name,
 ):
 
     ## deposit to the vault after approving
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
     # deploy our new strategy
-    new_strategy = strategist.deploy(StrategyCvxStaking, vault)
+    new_strategy = strategist.deploy(StrategyCvxStaking, vault, strategy_name)
     total_old = strategy.estimatedTotalAssets()
 
     # can we harvest an unactivated strategy? should be no
@@ -209,12 +214,12 @@ def test_odds_and_ends_migration(
 
 
 def test_odds_and_ends_liquidatePosition(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
     # this is part of our check into the staking contract balance
@@ -269,13 +274,13 @@ def test_odds_and_ends_liquidatePosition(
 
 
 def test_odds_and_ends_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -301,13 +306,13 @@ def test_odds_and_ends_rekt(
 
 # goal of this one is to hit a withdraw when we don't have any staked assets
 def test_odds_and_ends_liquidate_rekt(
-    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking
+    gov, token, vault, strategist, whale, strategy, chain, strategist_ms, staking, amount,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2 ** 256 - 1, {"from": whale})
-    vault.deposit(1000e18, {"from": whale})
+    vault.deposit(amount, {"from": whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -335,6 +340,7 @@ def test_weird_reverts(
     staking,
     StrategyCvxStaking,
     other_vault_strategy,
+    amount,
 ):
 
     # only vault can call this
@@ -352,3 +358,32 @@ def test_weird_reverts(
     # can't do health check with a non-health check contract
     with brownie.reverts():
         strategy.withdraw(1e18, {"from": gov})
+
+# this one makes sure our harvestTrigger doesn't trigger when we don't have assets in the strategy
+def test_odds_and_ends_inactive_strat(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    amount,
+):
+    ## deposit to the vault after approving
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+
+    ## move our funds out of the strategy
+    vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
+    strategy.harvest({"from": gov})
+
+    # we shouldn't harvest empty strategies
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+

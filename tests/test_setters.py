@@ -3,7 +3,27 @@ from brownie import Contract
 from brownie import config
 
 
-def test_setters(gov, strategy, strategist, chain, whale):
+def test_setters(gov, strategy, strategist, chain, whale, amount, token, vault,):
+
+    # test our manual harvest trigger
+    strategy.setManualHarvest(True, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+    strategy.setManualHarvest(False, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    # test our manual harvest trigger, and that a harvest turns it off
+    strategy.setManualHarvest(True, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+    strategy.harvest({"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
 
     # test our setters in baseStrategy and our main strategy
     strategy.setDebtThreshold(100, {"from": gov})
@@ -14,10 +34,18 @@ def test_setters(gov, strategy, strategist, chain, whale):
     strategy.setProfitFactor(1000, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
     strategy.setClaim(True, {"from": gov})
+    strategy.setName("Poop", {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
     print("Strategy Name:", name)
+
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
 
     # health check stuff
     chain.sleep(1)
