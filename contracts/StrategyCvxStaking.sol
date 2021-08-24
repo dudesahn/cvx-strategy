@@ -104,7 +104,7 @@ contract StrategyCvxStaking is BaseStrategy {
     /* ========== VIEWS ========== */
 
     function name() external view override returns (string memory) {
-        return "StrategyCvxStaking";
+        return stratName;
     }
 
     function stakedBalance() public view returns (uint256) {
