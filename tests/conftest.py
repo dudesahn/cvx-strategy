@@ -19,14 +19,14 @@ def token():
 def whale(accounts):
     # Totally in it for the tech
     # Update this with a large holder of your want token (largest EOA holder of CVX)
-    whale = accounts.at("0x97B3629Dc0EaD17115b8f91a93509EA472FFAFCa", force=True)
+    whale = accounts.at("0xba1247e8F8f1E592A45925B7C1447d19cc7628B5", force=True)
     yield whale
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="module")
 def amount():
-    amount = 10000e18
+    amount = 1000e18
     yield amount
 
 
@@ -35,6 +35,10 @@ def amount():
 def strategy_name():
     strategy_name = "StrategyCVXStaking"
     yield strategy_name
+
+
+# Only worry about changing things above this line, unless you want to make changes to the vault or strategy.
+# ----------------------------------------------------------------------- #
 
 
 @pytest.fixture(scope="module")

@@ -54,18 +54,20 @@ contract StrategyCvxStaking is BaseStrategy {
         0xCF50b810E57Ac33B91dCF525C6ddd9881B139332;
 
     // Swap stuff
-
     address public sushiswap = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F; // default to sushiswap, more CRV and CVX liquidity there
     address[] public convexPath; // path to sell cvxCRV for more CVX
+
     IERC20 public constant cvxCrv =
         IERC20(0x62B9c7356A2Dc64a1969e19C23e4f579F9810Aa7);
     IERC20 public constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
-    IERC20 public constant cvx =
-        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
     IERC20 public constant weth =
         IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    bool internal keeperHarvestNow = false; // only set this to true when we want to trigger our keepers to harvest for us
+    IERC20 public constant cvx =
+        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
+
+    bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
+
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // only need this in emergencies
@@ -79,23 +81,24 @@ contract StrategyCvxStaking is BaseStrategy {
     {
         // initialize variables
         minReportDelay = 0;
-        maxReportDelay = 604800; // 7 days in seconds, if we hit this then harvestTrigger = True
-        profitFactor = 400;
-        debtThreshold = 500 * 1e18; // we shouldn't ever have loss, but set a bit of a buffer
-        healthCheck = address(0xDDCea799fF1699e98EDF118e0629A974Df7DF012); // health.ychad.eth
+        maxReportDelay = 7 days; // 7 days in seconds, if we hit this then harvestTrigger = True
+        profitFactor = 1_000; // in this strategy, profitFactor is only used for telling keep3rs when to move funds from vault to strategy
+        debtThreshold = 5 * 1e18; // we shouldn't ever have loss, but set a bit of a buffer
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; // health.ychad.eth
 
         // want is CVX
-        want.safeApprove(cvxStaking, type(uint256).max);
+        want.approve(cvxStaking, type(uint256).max);
 
         // approve our reward token
-        cvxCrv.safeApprove(sushiswap, type(uint256).max);
+        cvxCrv.approve(sushiswap, type(uint256).max);
 
-        // swap path
-        convexPath = new address[](4);
-        convexPath[0] = address(cvxCrv);
-        convexPath[1] = address(crv);
-        convexPath[2] = address(weth);
-        convexPath[3] = address(cvx);
+        // swap path. sadly this is the only way to do things currently :(
+        convexPath = [
+            address(cvxCrv),
+            address(crv),
+            address(weth),
+            address(cvx)
+        ];
 
         // set our strategy's name
         stratName = _stratName;
@@ -145,7 +148,7 @@ contract StrategyCvxStaking is BaseStrategy {
             );
         }
 
-        // debtOustanding will only be > 0 in the event of revoking or lowering debtRatio of a strategy
+        // debtOustanding will only be > 0 in the event of revoking or if we need to rebalance from a withdrawal or lowering the debtRatio
         if (_debtOutstanding > 0) {
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
@@ -178,7 +181,7 @@ contract StrategyCvxStaking is BaseStrategy {
         }
 
         // we're done harvesting, so reset our trigger if we used it
-        if (keeperHarvestNow) keeperHarvestNow = false;
+        forceHarvestTriggerOnce = false;
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
@@ -244,8 +247,7 @@ contract StrategyCvxStaking is BaseStrategy {
         override
         returns (address[] memory)
     {
-        address[] memory protected = new address[](0);
-        return protected;
+        return new address[](0);
     }
 
     /* ========== KEEP3RS ========== */
@@ -258,10 +260,14 @@ contract StrategyCvxStaking is BaseStrategy {
         returns (bool)
     {
         // trigger if we want to manually harvest
-        if (keeperHarvestNow) return true;
+        if (forceHarvestTriggerOnce) {
+            return true;
+        }
 
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
-        if (!isActive()) return false;
+        if (!isActive()) {
+            return false;
+        }
 
         return super.harvestTrigger(callCostinEth);
     }
@@ -294,8 +300,11 @@ contract StrategyCvxStaking is BaseStrategy {
     }
 
     // This allows us to manually harvest with our keeper as needed
-    function setManualHarvest(bool _keeperHarvestNow) external onlyAuthorized {
-        keeperHarvestNow = _keeperHarvestNow;
+    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
+        external
+        onlyAuthorized
+    {
+        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
