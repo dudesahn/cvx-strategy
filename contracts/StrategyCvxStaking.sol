@@ -43,6 +43,10 @@ interface IStaking {
     function balanceOf(address account) external view returns (uint256);
 }
 
+interface IDelegateRegistry {
+    function setDelegate(bytes32 id, address delegate) external;
+}
+
 contract StrategyCvxStaking is BaseStrategy {
     using SafeERC20 for IERC20;
     using Address for address;
@@ -72,6 +76,10 @@ contract StrategyCvxStaking is BaseStrategy {
 
     // only need this in emergencies
     bool public claim;
+
+    // use this to delegate our votes
+    address public constant delegateRegistry =
+        0x469788fE6E9E9681C6ebF3bF78e7Fd26Fc015446;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -310,5 +318,13 @@ contract StrategyCvxStaking is BaseStrategy {
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
     function setClaim(bool _claim) external onlyAuthorized {
         claim = _claim;
+    }
+
+    // Set our delegate EOA address for voting in CVX's snapshot vote
+    function setCvxDelegate(address _targetDelegate) external onlyGovernance {
+        IDelegateRegistry(delegateRegistry).setDelegate(
+            "cvx.eth",
+            _targetDelegate
+        );
     }
 }
